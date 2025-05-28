@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:async';
 
 void main() {
   runApp(const MyApp());
@@ -54,11 +57,68 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
+  bool _isLoading = false;
 
   void _incrementCounter() {
     setState(() {
       _counter++;
     });
+  }
+
+  Future<void> _insertPressRecord() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // 调用后端 API
+      const String apiUrl = 'http://localhost:3000/api/press';
+      
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        
+        if (responseData['success']) {
+          // 显示成功消息
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${responseData['message']} ID: ${responseData['data']['id']}'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+          debugPrint('成功插入数据库: ${responseData['data']}');
+        } else {
+          throw Exception(responseData['message']);
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      // 显示错误消息
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('数据库操作失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      debugPrint('错误详情: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -89,6 +149,21 @@ class _MyHomePageState extends State<MyHomePage> {
                   onChanged: (_) => widget.onThemeChanged(),
                 ),
               ],
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _isLoading ? null : _insertPressRecord,
+              icon: _isLoading 
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.touch_app),
+              label: Text(_isLoading ? '记录中...' : '每日按钮'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
             ),
           ],
         ),
